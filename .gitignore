@@ -1,0 +1,28 @@
+# Dependências (não usadas pela ferramenta — instaladas só para testes locais)
+node_modules/
+package-lock.json
+package.json
+
+# Planilhas e resultados (dados sensíveis de pacientes — nunca versionar)
+*.xlsx
+*.xls
+*.csv
+guias_cruzadas.xlsx
+
+
+# Logs e arquivos temporários
+*.log
+tmp/
+.cache/
+
+# Sistema operacional
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# Editores / IDEs
+.vscode/
+.idea/
+*.swp
+*~
