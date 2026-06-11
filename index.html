@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Valida Guias</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>VALIDA GUIAS</h1>
+      <p class="subtitle">
+        Cruza a planilha de agendamentos com a de guias assinadas e gera a
+        planilha consolidada.
+      </p>
+      <section>
+        <div class="card">
+          <div class="field-label">Planilha de Agendamentos</div>
+          <label class="dropzone" for="arqAgenda">
+            <span class="dropzone-title">Selecione o arquivo de agendamentos</span>
+            <span class="dropzone-hint">CSV, XLSX ou XLS</span>
+            <input type="file" id="arqAgenda" accept=".xlsx,.xls,.csv" />
+          </label>
+          <div class="file-status" id="statusAgenda"></div>
+        </div>
+
+        <div class="card">
+          <div class="field-label">Planilha de Guias Assinadas</div>
+          <label class="dropzone" for="arqGuias">
+            <span class="dropzone-title">Selecione o arquivo de guias</span>
+            <span class="dropzone-hint">CSV, XLSX ou XLS</span>
+            <input type="file" id="arqGuias" accept=".xlsx,.xls,.csv" />
+          </label>
+          <div class="file-status" id="statusGuias"></div>
+        </div>
+      </section>
+
+      <button id="cruzar" disabled>Cruzar dados e baixar planilha</button>
+
+      <div id="status"></div>
+      <div class="resumo" id="resumo"></div>
+    </div>
+
+    <script src="script.js"></script>
+
+    <footer>Desenvolvido por - Williams Licar</footer>
+  </body>
+</html>
