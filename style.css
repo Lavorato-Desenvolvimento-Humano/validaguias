@@ -1,0 +1,174 @@
+:root {
+        --bg: #f4f4f5c5;
+        --card: #ffffff;
+        --border: #dfdfe2b7;
+        --text: #27272a;
+        --muted: #71717a;
+        --accent: #1c77b4c7;
+        --accent-hover: #1580c7;
+        --disabled: #d4d4d8;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          sans-serif;
+        font-size: 15px;
+        line-height: 1.5;
+        display: flex;
+        flex-direction: column;   /* empilha de cima para baixo */
+        align-items: center;      /* centraliza na horizontal (substitui o justify-content:center) */
+        min-height: 100vh; 
+        padding: 40px 16px; 
+      }
+      .container {
+        width: 100%;
+        max-width: 840px;
+      }
+
+      section{
+        display: flex;
+        flex-direction: row;
+        gap: 20px;
+      }
+
+      h1 {
+        font-size: 40px;
+        font-weight: 700;
+        margin: 0 0 4px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .subtitle {
+        color: var(--muted);
+        margin: 0 0 28px;
+        font-size: 14px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 25px;
+        margin-bottom: 16px;
+        width: 100%;
+      }
+      .field-label {
+        font-weight: 500;
+        margin-bottom: 10px;
+      }
+      .field-hint {
+        color: var(--muted);
+        font-size: 13px;
+        margin-bottom: 10px;
+        height: 80px;
+      }
+      /* caixa de upload (dropzone) */
+      .dropzone {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 180px;
+        padding: 16px;
+        text-align: center;
+        border: 2px dashed var(--border);
+        border-radius: 20px;
+        cursor: pointer;
+        transition: border-color 0.15s, background 0.15s;
+      }
+      .dropzone:hover {
+        border-color: #9ca3af;
+        background: #f4f4f5;
+      }
+      /* input invisível cobrindo a caixa: habilita clique e arrastar-soltar */
+      .dropzone input[type="file"] {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+      }
+      .dropzone-icon {
+        font-size: 26px;
+        line-height: 1;
+        color: var(--muted);
+      }
+      .dropzone-title {
+        font-weight: 600;
+        color: var(--text);
+      }
+      .dropzone-hint {
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .file-status {
+        font-size: 13px;
+        color: var(--muted);
+        margin-top: 6px;
+        min-height: 18px;
+      }
+      button#cruzar {
+        width: 100%;
+        padding: 15px;
+        font-size: 15px;
+        font-weight: 500;
+        border: none;
+        border-radius: 15px;
+        cursor: pointer;
+        background: var(--accent);
+        color: #fff;
+        transition: background 0.15s;
+        margin-top: 20px;
+      }
+      button#cruzar:hover:not(:disabled) {
+        background: var(--accent-hover);
+      }
+      button#cruzar:disabled {
+        background: rgba(212, 212, 212, 0.644);
+        color: #fff;
+        cursor: not-allowed;
+      }
+      #status {
+        margin-top: 16px;
+        font-size: 14px;
+        color: var(--text);
+        min-height: 20px;
+      }
+      #status .erro {
+        color: #991b1b;
+      }
+      .resumo {
+        margin-top: 12px;
+        padding: 12px 14px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: #fafafa;
+        font-size: 14px;
+        display: none;
+      }
+      .resumo span {
+        display: inline-block;
+        margin-right: 18px;
+      }
+      .resumo b {
+        font-weight: 600;
+      }
+      footer {
+        margin-top: auto;
+        text-align: center;
+        color: var(--muted);
+        font-size: 12px;
+      }
