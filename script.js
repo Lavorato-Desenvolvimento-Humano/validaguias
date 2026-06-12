@@ -342,19 +342,19 @@
             return linha;
           });
 
-          // --- ordenar: Nome A→Z, Convênio A→Z, Hora crescente ---
+          // --- ordenar: Hora crescente (principal), depois Nome A→Z e Convênio A→Z ---
           saida.sort(function (x, y) {
+            if (colHoraA) {
+              var h = horaEmMinutos(x[colHoraA]) - horaEmMinutos(y[colHoraA]);
+              if (h !== 0) return h;
+            }
             var n = normalizar(x[colNomeA]).localeCompare(
               normalizar(y[colNomeA]),
             );
             if (n !== 0) return n;
-            var c = normalizar(x[colConvA]).localeCompare(
+            return normalizar(x[colConvA]).localeCompare(
               normalizar(y[colConvA]),
             );
-            if (c !== 0) return c;
-            if (colHoraA)
-              return horaEmMinutos(x[colHoraA]) - horaEmMinutos(y[colHoraA]);
-            return 0;
           });
 
           // --- gerar e baixar a planilha ---
