@@ -375,6 +375,18 @@
             return o;
           });
           var ws = XLSX.utils.json_to_sheet(saidaFinal, { header: ordemColunas });
+
+          // largura automática das colunas (senão saem coladas/cortadas no Excel):
+          // para cada coluna, usa o maior conteúdo entre o cabeçalho e as células
+          ws["!cols"] = ordemColunas.map(function (col) {
+            var maxLen = col.length;
+            saidaFinal.forEach(function (linha) {
+              var val = linha[col] == null ? "" : String(linha[col]);
+              if (val.length > maxLen) maxLen = val.length;
+            });
+            return { wch: Math.min(maxLen + 2, 50) }; // +2 de folga, teto de 50
+          });
+
           var wb = XLSX.utils.book_new();
           XLSX.utils.book_append_sheet(wb, ws, "Cruzamento");
           XLSX.writeFile(wb, "guias_cruzadas.xlsx");
