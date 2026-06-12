@@ -271,6 +271,7 @@
           ]);
           var colConvG = acharColuna(guias.headers, ["CONVENIO", "PLANO"]);
           var colStatusG = acharColuna(guias.headers, ["STATUS", "SITUACAO"]);
+          var colGuiaG = acharColuna(guias.headers, ["GUIA"]);
           // competência pode vir como coluna única OU separada em mês + ano
           var colCompG = acharColuna(guias.headers, [
             "COMPETENCIA",
@@ -312,6 +313,7 @@
             (indiceGuias[chave] = indiceGuias[chave] || []).push({
               conv: normalizar(g[colConvG]),
               status: colStatusG ? String(g[colStatusG]).trim() : "",
+              guia: colGuiaG ? g[colGuiaG] : "",
             });
           });
 
@@ -335,9 +337,11 @@
               encontradas++;
               var st = achada.status || "Guia encontrada";
               linha["Situação da Guia"] = st;
+              linha["guias"] = achada.guia != null ? achada.guia : "";
               porStatus[st] = (porStatus[st] || 0) + 1;
             } else {
               linha["Situação da Guia"] = "";
+              linha["guias"] = "";
             }
             return linha;
           });
@@ -359,10 +363,17 @@
 
           // --- gerar e baixar a planilha ---
           // colunas a remover do resultado (por nome normalizado)
-          var COLUNAS_EXCLUIR = ["TERAPEUTA", "ESPECIALIDADE", "OBS"];
+          var COLUNAS_EXCLUIR = ["ESPECIALIDADE", "OBS"];
           var ordemColunas = agenda.headers.filter(function (h) {
             return COLUNAS_EXCLUIR.indexOf(normalizar(h)) === -1;
           });
+          // insere "guias" (número da guia) logo após a coluna de Convênio
+          var idxConv = ordemColunas.indexOf(colConvA);
+          if (idxConv !== -1) {
+            ordemColunas.splice(idxConv + 1, 0, "guias");
+          } else {
+            ordemColunas.push("guias");
+          }
           if (ordemColunas.indexOf("Situação da Guia") === -1)
             ordemColunas.push("Situação da Guia");
           // monta cada linha SÓ com as colunas desejadas — o "header" do
