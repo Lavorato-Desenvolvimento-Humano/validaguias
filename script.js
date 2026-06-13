@@ -137,6 +137,37 @@
           return false;
         }
 
+        // reduz o nome do procedimento (agenda OU guia) a uma CATEGORIA canônica,
+        // para validar atendimento x guia mesmo com textos diferentes nos dois sistemas.
+        // ORDEM IMPORTA: "ABA" é testado primeiro — uma sessão "FONO COM TERAPIA ABA"
+        // é validada por guia de TERAPIA ABA, não pela especialidade base.
+        function categoria(servico) {
+          var s = normalizar(servico);
+          if (!s) return "";
+          if (s.indexOf("ABA") !== -1) return "TERAPIA ABA";
+          if (s.indexOf("NEUROPSICOL") !== -1) return "AVALIACAO NEUROPSICOLOGICA";
+          if (s.indexOf("FONOAUDIOLOG") !== -1) return "FONOAUDIOLOGIA";
+          if (s.indexOf("MUSICOTERAP") !== -1) return "MUSICOTERAPIA";
+          if (s.indexOf("NUTRI") !== -1) return "NUTRICAO";
+          if (s.indexOf("PSICOMOTRIC") !== -1) return "PSICOMOTRICIDADE";
+          if (s.indexOf("PSICOPEDAG") !== -1) return "PSICOPEDAGOGIA";
+          if (s.indexOf("FISIOTERAP") !== -1) return "FISIOTERAPIA";
+          if (s.indexOf("TERAPIA OCUPACIONAL") !== -1) return "TERAPIA OCUPACIONAL";
+          if (s.indexOf("PSICOLOG") !== -1 || s.indexOf("PSICOTERAP") !== -1)
+            return "PSICOTERAPIA";
+          if (s.indexOf("PACOTE") !== -1) return "PACOTE";
+          return "OUTROS";
+        }
+
+        // convênios cujas sessões (exceto psicoterapia e avaliação neuro) são
+        // cobertas por uma guia de PACOTE de horas, e não por guia da especialidade
+        var CONVENIOS_PACOTE = ["SAUDE CAIXA"];
+        function isConvenioPacote(conv) {
+          return CONVENIOS_PACOTE.some(function (c) {
+            return conv.indexOf(c) !== -1;
+          });
+        }
+
         // --- leitura de arquivo --------------------------------------------
 
         function lerPlanilha(file) {
@@ -261,6 +292,10 @@
             "HORARIO",
             "ENTRADA",
           ]);
+          var colServA = acharColuna(agenda.headers, [
+            "SERVICO",
+            "PROCEDIMENTO",
+          ]);
 
           // --- localizar colunas (guias) ---
           var colNomeG = acharColuna(guias.headers, [
@@ -272,6 +307,11 @@
           var colConvG = acharColuna(guias.headers, ["CONVENIO", "PLANO"]);
           var colStatusG = acharColuna(guias.headers, ["STATUS", "SITUACAO"]);
           var colGuiaG = acharColuna(guias.headers, ["GUIA"]);
+          var colServicoG = acharColuna(guias.headers, [
+            "SERVICO",
+            "PROCEDIMENTO",
+            "ESPECIALIDADE",
+          ]);
           // competência pode vir como coluna única OU separada em mês + ano
           var colCompG = acharColuna(guias.headers, [
             "COMPETENCIA",
@@ -304,9 +344,12 @@
             return competencia(g[colCompG]);
           }
 
-          // --- índice das guias por NOME + COMPETÊNCIA → lista de {convênio, status} ---
+          // só validamos por procedimento se as duas planilhas tiverem a coluna
+          var validarProcedimento = !!(colServA && colServicoG);
+
+          // --- índice das guias por NOME + COMPETÊNCIA → lista de {convênio, status, guia, categoria} ---
           // (o convênio é checado depois com tolerância, pois os sistemas usam rótulos diferentes;
-          //  guarda o status para indicar ONDE a guia está: "Assinado" ou "Enviado a BM")
+          //  o status indica ONDE a guia está; a categoria valida o procedimento)
           var indiceGuias = {};
           guias.rows.forEach(function (g) {
             var chave = normalizar(g[colNomeG]) + "|" + compDaGuia(g);
@@ -314,34 +357,99 @@
               conv: normalizar(g[colConvG]),
               status: colStatusG ? String(g[colStatusG]).trim() : "",
               guia: colGuiaG ? g[colGuiaG] : "",
+              cat: colServicoG ? categoria(g[colServicoG]) : "",
             });
           });
 
+          // retorna a primeira guia ainda NÃO usada de uma lista (ou null)
+          function primeiraLivre(lista) {
+            for (var i = 0; i < lista.length; i++) {
+              if (!lista[i].usada) return lista[i];
+            }
+            return null;
+          }
+
+          // escolhe a guia para um agendamento, CONSUMINDO uma guia por sessão:
+          // cada guia de procedimento é atribuída no máximo a uma sessão, para que
+          // cada agendamento tenha o SEU próprio número de guia.
+          // retorna { guia, obs } ou null (pendente). obs != "" sinaliza divergência.
+          function escolherGuia(convA, agendaCat, guiasDoPaciente) {
+            // só guias do mesmo convênio (com tolerância de nome)
+            var doConvenio = guiasDoPaciente.filter(function (g) {
+              return convenioCasa(convA, g.conv);
+            });
+            if (!doConvenio.length) return null;
+
+            // sem validação por procedimento → consome qualquer guia livre (1 por sessão)
+            if (!validarProcedimento) {
+              var qualquer = primeiraLivre(doConvenio);
+              if (qualquer) {
+                qualquer.usada = true;
+                return { guia: qualquer, obs: "" };
+              }
+              return null;
+            }
+
+            // 1) match limpo: guia NÃO USADA da MESMA categoria do agendamento
+            if (agendaCat && agendaCat !== "OUTROS") {
+              var mesmaCat = doConvenio.filter(function (g) {
+                return g.cat === agendaCat;
+              });
+              if (mesmaCat.length) {
+                var livre = primeiraLivre(mesmaCat);
+                if (livre) {
+                  livre.usada = true;
+                  return { guia: livre, obs: "" };
+                }
+                // há guias dessa categoria, mas todas já foram atribuídas a outras
+                // sessões (mais sessões do que guias) → pendente
+                return null;
+              }
+            }
+
+            // 2) convênio-pacote (ex.: Saúde Caixa): psicoterapia e avaliação neuro
+            //    casam pela própria categoria (acima); o RESTO é coberto por uma
+            //    guia de PACOTE de horas — que é COMPARTILHADA (não se consome)
+            if (
+              isConvenioPacote(convA) &&
+              agendaCat !== "PSICOTERAPIA" &&
+              agendaCat !== "AVALIACAO NEUROPSICOLOGICA"
+            ) {
+              for (var i = 0; i < doConvenio.length; i++) {
+                if (doConvenio[i].cat === "PACOTE")
+                  return { guia: doConvenio[i], obs: "" };
+              }
+            }
+
+            // 3) tem guia no convênio/mês, mas de outro procedimento → assina sinalizando
+            //    (apenas informativo; não consome a guia)
+            return { guia: doConvenio[0], obs: "Guia de outro procedimento" };
+          }
+
           // --- cruzar cada agendamento ---
           var encontradas = 0;
+          var sinalizadas = 0;
           var porStatus = {};
           var saida = agenda.rows.map(function (a) {
             var convA = normalizar(a[colConvA]);
+            var agendaCat = colServA ? categoria(a[colServA]) : "";
             var chave =
               normalizar(a[colNomeA]) + "|" + competencia(a[colDataA]);
-            var guiasDoPaciente = indiceGuias[chave] || [];
-            var achada = null;
-            for (var i = 0; i < guiasDoPaciente.length; i++) {
-              if (convenioCasa(convA, guiasDoPaciente[i].conv)) {
-                achada = guiasDoPaciente[i];
-                break;
-              }
-            }
+            var res = escolherGuia(convA, agendaCat, indiceGuias[chave] || []);
+
             var linha = Object.assign({}, a);
-            if (achada) {
+            if (res) {
               encontradas++;
-              var st = achada.status || "Guia encontrada";
+              var st = res.guia.status || "Guia encontrada";
               linha["Situação da Guia"] = st;
-              linha["guias"] = achada.guia != null ? achada.guia : "";
+              linha["guias"] = res.guia.guia != null ? res.guia.guia : "";
+              linha["Obs. Validação"] = res.obs;
+              if (res.obs) sinalizadas++;
               porStatus[st] = (porStatus[st] || 0) + 1;
             } else {
               linha["Situação da Guia"] = "";
               linha["guias"] = "";
+              linha["Obs. Validação"] = "";
             }
             return linha;
           });
@@ -376,6 +484,8 @@
           }
           if (ordemColunas.indexOf("Situação da Guia") === -1)
             ordemColunas.push("Situação da Guia");
+          if (ordemColunas.indexOf("Obs. Validação") === -1)
+            ordemColunas.push("Obs. Validação");
           // monta cada linha SÓ com as colunas desejadas — o "header" do
           // json_to_sheet apenas ordena; chaves extras seriam anexadas ao fim
           var saidaFinal = saida.map(function (linha) {
@@ -418,6 +528,11 @@
               );
             })
             .join("");
+          var sinalizadasHtml = sinalizadas
+            ? "<span><b>" +
+              sinalizadas +
+              "</b> com guia de outro procedimento (conferir)</span>"
+            : "";
           resumo.innerHTML =
             "<span><b>" +
             total +
@@ -428,7 +543,8 @@
             "<span><b>" +
             pendentes +
             "</b> pendentes</span>" +
-            detalhe;
+            detalhe +
+            sinalizadasHtml;
           resumo.style.display = "block";
           atualizarBotao();
         }
