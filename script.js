@@ -168,6 +168,39 @@
           });
         }
 
+        // convênios que RENOVAM a guia toda semana: por especialidade usamos
+        // sempre a guia mais recente (por data de criação), que corresponde à
+        // semana do atendimento. Avaliação neuro é exceção (dura mais).
+        var CONVENIOS_RENOVA_SEMANAL = ["BRADESCO"];
+        function isConvenioRenovaSemanal(conv) {
+          return CONVENIOS_RENOVA_SEMANAL.some(function (c) {
+            return conv.indexOf(c) !== -1;
+          });
+        }
+
+        // converte a data de criação da guia em número comparável (timestamp);
+        // aceita Date nativo, "AAAA-MM-DD HH:MM:SS" e "DD/MM/AAAA"
+        function tempoCriacao(v) {
+          if (v instanceof Date && !isNaN(v)) return v.getTime();
+          if (v == null || v === "") return 0;
+          var s = String(v);
+          var m = s.match(
+            /(\d{4})\D(\d{1,2})\D(\d{1,2})(?:\D+(\d{1,2})\D(\d{1,2})(?:\D(\d{1,2}))?)?/,
+          );
+          if (m)
+            return new Date(
+              +m[1],
+              +m[2] - 1,
+              +m[3],
+              +(m[4] || 0),
+              +(m[5] || 0),
+              +(m[6] || 0),
+            ).getTime();
+          var d = s.match(/(\d{1,2})\D(\d{1,2})\D(\d{4})/);
+          if (d) return new Date(+d[3], +d[2] - 1, +d[1]).getTime();
+          return 0;
+        }
+
         // --- leitura de arquivo --------------------------------------------
 
         function lerPlanilha(file) {
@@ -312,6 +345,11 @@
             "PROCEDIMENTO",
             "ESPECIALIDADE",
           ]);
+          var colDataCriacaoG = acharColuna(guias.headers, [
+            "CRIACAO",
+            "EMISSAO",
+            "DATA-CRIACAO",
+          ]);
           // competência pode vir como coluna única OU separada em mês + ano
           var colCompG = acharColuna(guias.headers, [
             "COMPETENCIA",
@@ -358,6 +396,7 @@
               status: colStatusG ? String(g[colStatusG]).trim() : "",
               guia: colGuiaG ? g[colGuiaG] : "",
               cat: colServicoG ? categoria(g[colServicoG]) : "",
+              criacao: colDataCriacaoG ? tempoCriacao(g[colDataCriacaoG]) : 0,
             });
           });
 
@@ -390,12 +429,27 @@
               return null;
             }
 
-            // 1) match limpo: guia NÃO USADA da MESMA categoria do agendamento
+            // 1) match limpo: guia da MESMA categoria do agendamento
             if (agendaCat && agendaCat !== "OUTROS") {
               var mesmaCat = doConvenio.filter(function (g) {
                 return g.cat === agendaCat;
               });
               if (mesmaCat.length) {
+                // Bradesco (renovação semanal), exceto avaliação neuro: usa SEMPRE
+                // a guia mais recente por data — corresponde à semana do atendimento;
+                // é compartilhada entre as sessões (não consome) e ignora as antigas.
+                if (
+                  isConvenioRenovaSemanal(convA) &&
+                  agendaCat !== "AVALIACAO NEUROPSICOLOGICA"
+                ) {
+                  var recente = mesmaCat[0];
+                  for (var k = 1; k < mesmaCat.length; k++) {
+                    if (mesmaCat[k].criacao > recente.criacao)
+                      recente = mesmaCat[k];
+                  }
+                  return { guia: recente, obs: "" };
+                }
+                // demais: distribui uma guia distinta por sessão (consome)
                 var livre = primeiraLivre(mesmaCat);
                 if (livre) {
                   livre.usada = true;
