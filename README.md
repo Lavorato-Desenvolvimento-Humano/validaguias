@@ -45,10 +45,13 @@ Para cada linha da planilha de agendamentos, o sistema procura a guia correspond
 
 Como os dois sistemas usam nomes diferentes para o mesmo procedimento, cada serviço (da agenda e da guia) é reduzido a uma **categoria canônica** antes de comparar. Ex.: `SESSÃO DE PSICOLOGIA INDIVIDUAL` e `CONSULTA… COM PSICOLOGO` → `PSICOTERAPIA`; `AVALIACAO NEUROPSICOLOGIA` → `AVALIACAO NEUROPSICOLOGICA`.
 
+Quando o paciente tem **várias guias do mesmo procedimento**, o sistema atribui **uma guia distinta por sessão** (consome cada guia uma vez). Se houver mais sessões do que guias daquele procedimento, a sessão sobrando fica **pendente**.
+
 Regras especiais:
 
 - **Terapia ABA:** qualquer serviço "COM TERAPIA ABA" (ou pacote ABA) é tratado como categoria **TERAPIA ABA** e validado por uma guia de ABA — não pela especialidade base (fono, psicologia, etc.).
 - **Convênios com pacote de horas (Saúde Caixa):** psicoterapia casa com guia de psicoterapia e avaliação neuro com a dela; **todos os demais** procedimentos (fono, psicopedagogia, TO, fisio…) são cobertos por uma guia de **PACOTE**. *(Não há contagem de horas 2/4/6h — apenas a presença do pacote.)* A lista desses convênios fica em `CONVENIOS_PACOTE`, no `script.js`.
+- **Convênios com renovação semanal (Bradesco):** as guias são renovadas toda semana, então, por especialidade, usa-se sempre a **guia mais recente** (pela coluna de **data de criação**), que corresponde à semana do atendimento. Essa guia é compartilhada entre as sessões da semana e as guias antigas são ignoradas. **Exceção: Avaliação Neuropsicológica**, que dura mais tempo e segue a regra padrão. A lista fica em `CONVENIOS_RENOVA_SEMANAL`, no `script.js`. *(Requer a coluna de data de criação na planilha de guias; sem ela, cai na regra padrão.)*
 
 ---
 
@@ -63,6 +66,7 @@ A ferramenta lida com arquivos exportados direto dos sistemas, sem ajuste manual
   - Hora: `Início`, `Hora`, `Horário`, `Entrada`
   - Procedimento: `Serviço`, `Procedimento`, `Especialidade`
   - Competência: coluna única **ou** colunas separadas `mês` + `ano`
+  - Data de criação da guia: `data-criacao`, `criação`, `emissão` (usada na regra de renovação semanal)
 - **Datas** — entende texto (`12/06/2026`) e o formato nativo do Excel.
 - **Largura das colunas** ajustada automaticamente no arquivo gerado.
 
