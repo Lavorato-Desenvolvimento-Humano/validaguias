@@ -2,7 +2,7 @@
         "use strict";
 
         // ==================================================================
-        // TABELA DE-PARA DE PROCEDIMENTOS  (edite aqui se surgirem novos nomes)
+        // TABELA DE-PARA DE PROCEDIMENTOS
         // ------------------------------------------------------------------
         // Cada par é [ nome do serviço como vem nas planilhas , categoria ].
         // A categoria DEVE ser uma destas: TERAPIA ABA, PSICOTERAPIA,
@@ -588,18 +588,18 @@
             return linha;
           });
 
-          // --- ordenar: Hora crescente (principal), depois Nome A→Z e Convênio A→Z ---
+          // --- ordenar: Convênio A-> Z, depois Nome A→Z ---
           saida.sort(function (x, y) {
-            if (colHoraA) {
-              var h = horaEmMinutos(x[colHoraA]) - horaEmMinutos(y[colHoraA]);
-              if (h !== 0) return h;
-            }
+            var c = normalizar(x[colConvA]).localeCompare(
+              normalizar(y[colConvA]));
+              if (c !== 0 ) return c;
+            // Para validar por hora.
+            // if (colHoraA) {
+            //   var h = horaEmMinutos(x[colHoraA]) - horaEmMinutos(y[colHoraA]);
+            //   if (h !== 0) return h;
+            // }
             var n = normalizar(x[colNomeA]).localeCompare(
               normalizar(y[colNomeA]),
-            );
-            if (n !== 0) return n;
-            return normalizar(x[colConvA]).localeCompare(
-              normalizar(y[colConvA]),
             );
           });
 
