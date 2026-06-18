@@ -1,6 +1,58 @@
 (function () {
         "use strict";
 
+        // ==================================================================
+        // TABELA DE-PARA DE PROCEDIMENTOS  (edite aqui se surgirem novos nomes)
+        // ------------------------------------------------------------------
+        // Cada par é [ nome do serviço como vem nas planilhas , categoria ].
+        // A categoria DEVE ser uma destas: TERAPIA ABA, PSICOTERAPIA,
+        // FONOAUDIOLOGIA, TERAPIA OCUPACIONAL, PSICOPEDAGOGIA, PSICOMOTRICIDADE,
+        // MUSICOTERAPIA, FISIOTERAPIA, NUTRICAO, AVALIACAO NEUROPSICOLOGICA, PACOTE.
+        // A busca ignora maiúsculas/minúsculas e acentos.
+        // Nomes que NÃO estiverem aqui caem no reconhecimento por palavra-chave
+        // e, por fim, na coluna "Especialidade" da agenda.
+        // ==================================================================
+        var DE_PARA_PROCEDIMENTOS = [
+          ["PSICOTERAPIA INDIVIDUAL INFANTIL(SESSÕES DE PSICOTERAPIA ABA)", "TERAPIA ABA"],
+          ["SESSÃO DE PSICOPEDAGOGIA", "PSICOPEDAGOGIA"],
+          ["CONSULTA/SESSÃO INDIVIDUAL AMBULATORIAL COM PSICOLOGO", "PSICOTERAPIA"],
+          ["SESSÃO DE PSICOLOGIA INDIVIDUAL", "PSICOTERAPIA"],
+          ["SESSÃO DE PSICOLOGIA COM TERAPIA ABA", "TERAPIA ABA"],
+          ["PACOTE - ATENDIMENTO INTEGRADO 2H - PACIENTES TGD/TEA", "PACOTE"],
+          ["SESSÃO DE TERAPIA OCUPACIONAL COM TERAPIA ABA", "TERAPIA ABA"],
+          ["SESSÃO DE FONOAUDIOLOGIA", "FONOAUDIOLOGIA"],
+          ["SESSÃO DE TERAPIA OCUPACIONAL", "TERAPIA OCUPACIONAL"],
+          ["AVALIAÇÃO NEUROPSICOLÓGIA", "AVALIACAO NEUROPSICOLOGICA"],
+          ["TERAPIA ABA - SESSAO", "TERAPIA ABA"],
+          ["SESSÃO DE TERAPIA OCUPACIONAL - PELO MÉTODO ABA", "TERAPIA ABA"],
+          ["TERAPIA COM ABA (ANÁLISE AMBULATORIAL DE COMPORTAMENTO APLICADA) - PACOTE", "TERAPIA ABA"],
+          ["SESSÃO DE PSICOPEDAGOGIA - PELO MÉTODO ABA", "TERAPIA ABA"],
+          ["SESSÃO DE FISIOTERAPIA", "FISIOTERAPIA"],
+          ["SESSÃO DE MUSICOTERAPIA COM TERAPIA ABA", "TERAPIA ABA"],
+          ["SESSÃO DE PSICOMOTRICIDADE", "PSICOMOTRICIDADE"],
+          ["PR P AVAL NEUROPSICOLOGA SESSÕES SUBSEQUENTES", "AVALIACAO NEUROPSICOLOGICA"],
+          ["SESSÃO DE TERAPIA COMPORTAMENTAL APLICADA", "TERAPIA ABA"],
+          ["PSICOTERAPIA INDIVIDUAL", "PSICOTERAPIA"],
+          ["TERAPIA OCUPACIONAL - AVALIACAO DOS COMPONENTES DE DESEMPENHO OCUPACIONAL - SESSOES", "TERAPIA ABA"],
+          ["CONSULTA/SESSÃO INDIVIDUAL AMBULATORIAL DE FONOAUDIOLOGIA", "FONOAUDIOLOGIA"],
+          ["TRATAMENTO TEA E OUTROS TRANSTORNOS GLOBAIS DO DESENVOLVIMENTO - POR DIA COM PSICOLOGO", "PSICOTERAPIA"],
+          ["SESSÃO DE FONOAUDIOLOGIA COM TERAPIA ABA", "TERAPIA ABA"],
+          ["SESSÃO DE MUSICOTERAPIA", "MUSICOTERAPIA"],
+          ["PSICOPEDAGOGIA INDIVIDUAL", "PSICOPEDAGOGIA"],
+          ["SESSOES DE FONOTERAPIA/FONOAUDIOLOGIA", "FONOAUDIOLOGIA"],
+          ["SESSÃO DE NUTRIÇÃO", "NUTRICAO"],
+          ["TERAPIA ABA - ATENDIMENTO SEMANAL CONFORME ESPECIFICACAO MEDICA", "TERAPIA ABA"],
+          ["SESSAO DE PSICOTERAPIA INDIVIDUAL POR PSICOLOGO", "PSICOTERAPIA"],
+          // "TRATAMENTO TEA ... POR DIA" (sem psicólogo) fica de fora de propósito:
+          // cai no fallback da coluna Especialidade da agenda.
+          ["SESSÃO DE PSICOTERAPIA", "PSICOTERAPIA"],
+          ["RETARDO DO DESENVOLVIMENTO PSICOMOTOR - TRATAMENTO GLOBAL (FISIOTERAPIA)", "FISIOTERAPIA"],
+          ["SESSAO DE ORIENTACAO/ACOLHIMENTO AO FAMILIAR TGD/TEA", "PSICOTERAPIA"],
+          ["CONSULTA COM PSICOLOGIA - AVALIAÇÃO", "PSICOTERAPIA"],
+          ["FONOAUDIOLOGIA", "FONOAUDIOLOGIA"],
+          ["ACOMPANHANTE TERAPEUTICO", "PSICOTERAPIA"],
+        ];
+
         var arqAgenda = document.getElementById("arqAgenda");
         var arqGuias = document.getElementById("arqGuias");
         var btn = document.getElementById("cruzar");
@@ -157,6 +209,30 @@
             return "PSICOTERAPIA";
           if (s.indexOf("PACOTE") !== -1) return "PACOTE";
           return "OUTROS";
+        }
+
+        // mapa normalizado da tabela de-para (montado uma vez)
+        var MAPA_CONSOLIDADO = {};
+        DE_PARA_PROCEDIMENTOS.forEach(function (par) {
+          MAPA_CONSOLIDADO[normalizar(par[0])] = par[1];
+        });
+
+        // categoria de um serviço: 1º a tabela de-para curada; senão, palavra-chave
+        function consolidar(servico) {
+          var n = normalizar(servico);
+          if (MAPA_CONSOLIDADO[n]) return MAPA_CONSOLIDADO[n];
+          return categoria(servico);
+        }
+
+        // categoria de um agendamento: consolida pelo Serviço; se não identificar
+        // (OUTROS), usa a coluna Especialidade da agenda (profissional → categoria)
+        function categoriaAgenda(servico, especialidade) {
+          var c = consolidar(servico);
+          if (!c || c === "OUTROS") {
+            var ce = categoria(especialidade);
+            if (ce && ce !== "OUTROS") return ce;
+          }
+          return c;
         }
 
         // convênios cujas sessões (exceto psicoterapia e avaliação neuro) são
@@ -329,6 +405,7 @@
             "SERVICO",
             "PROCEDIMENTO",
           ]);
+          var colEspA = acharColuna(agenda.headers, ["ESPECIALIDADE"]);
 
           // --- localizar colunas (guias) ---
           var colNomeG = acharColuna(guias.headers, [
@@ -344,6 +421,7 @@
             "SERVICO",
             "PROCEDIMENTO",
             "ESPECIALIDADE",
+            
           ]);
           var colDataCriacaoG = acharColuna(guias.headers, [
             "CRIACAO",
@@ -395,7 +473,7 @@
               conv: normalizar(g[colConvG]),
               status: colStatusG ? String(g[colStatusG]).trim() : "",
               guia: colGuiaG ? g[colGuiaG] : "",
-              cat: colServicoG ? categoria(g[colServicoG]) : "",
+              cat: colServicoG ? consolidar(g[colServicoG]) : "",
               criacao: colDataCriacaoG ? tempoCriacao(g[colDataCriacaoG]) : 0,
             });
           });
@@ -486,7 +564,9 @@
           var porStatus = {};
           var saida = agenda.rows.map(function (a) {
             var convA = normalizar(a[colConvA]);
-            var agendaCat = colServA ? categoria(a[colServA]) : "";
+            var agendaCat = colServA
+              ? categoriaAgenda(a[colServA], colEspA ? a[colEspA] : "")
+              : "";
             var chave =
               normalizar(a[colNomeA]) + "|" + competencia(a[colDataA]);
             var res = escolherGuia(convA, agendaCat, indiceGuias[chave] || []);
