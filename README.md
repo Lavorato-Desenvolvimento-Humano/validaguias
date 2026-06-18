@@ -45,6 +45,12 @@ Para cada linha da planilha de agendamentos, o sistema procura a guia correspond
 
 Como os dois sistemas usam nomes diferentes para o mesmo procedimento, cada serviço (da agenda e da guia) é reduzido a uma **categoria canônica** antes de comparar. Ex.: `SESSÃO DE PSICOLOGIA INDIVIDUAL` e `CONSULTA… COM PSICOLOGO` → `PSICOTERAPIA`; `AVALIACAO NEUROPSICOLOGIA` → `AVALIACAO NEUROPSICOLOGICA`.
 
+A categoria é decidida nesta ordem:
+
+1. **Tabela de-para curada** (`DE_PARA_PROCEDIMENTOS`, no topo do `script.js`) — mapeamento exato nome → categoria, fácil de editar quando surgirem nomes novos.
+2. **Palavra-chave** — se o nome não estiver na tabela, é reconhecido por trechos (`FONOAUDIOLOG`, `PSICOLOG`, `ABA`, etc.).
+3. **Coluna "Especialidade" da agenda** — se ainda assim não identificar (serviços genéricos como `TRATAMENTO TEA … POR DIA`), usa o profissional (`Fonoaudiólogo` → Fonoaudiologia, `Psicólogo Clínico` → Psicoterapia, `Aplicador Aba` → Terapia ABA, etc.).
+
 Quando o paciente tem **várias guias do mesmo procedimento**, o sistema atribui **uma guia distinta por sessão** (consome cada guia uma vez). Se houver mais sessões do que guias daquele procedimento, a sessão sobrando fica **pendente**.
 
 Regras especiais:
