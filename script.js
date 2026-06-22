@@ -86,6 +86,18 @@
         // nomes casam se o conjunto de tokens de um estiver CONTIDO no outro
         // (ignora ordem e preposições; tolera nome do meio faltando).
         // Exige >= 2 tokens no nome menor, para não casar só pelo primeiro nome.
+        // Trata iniciais: uma palavra de 1 letra casa com uma palavra do outro
+        // nome que comece com essa letra (ex.: "R" ~ "ROBERTO", "G" ~ "GRACIANO").
+        function tokenCasa(t, maior, set) {
+          if (set[t]) return true;
+          if (t.length === 1)
+            return maior.some(function (o) {
+              return o[0] === t;
+            });
+          return maior.some(function (o) {
+            return o.length === 1 && o === t[0];
+          });
+        }
         function nomesCasam(a, b) {
           if (!a.length || !b.length) return false;
           var menor = a.length <= b.length ? a : b;
@@ -96,7 +108,7 @@
             set[t] = 1;
           });
           return menor.every(function (t) {
-            return set[t];
+            return tokenCasa(t, maior, set);
           });
         }
 
