@@ -65,10 +65,39 @@
           if (v === null || v === undefined) return "";
           return String(v)
             .normalize("NFD")
-            .replace(/[̀-ͯ]/g, "") // remove acentos
+            .replace(/[\u0300-\u036f]/g, "") // remove acentos (marcas combinantes U+0300–U+036F)
             .toUpperCase()
             .replace(/\s+/g, " ")
             .trim();
+        }
+
+        // preposições/conectivos que não identificam o paciente
+        var PREPOSICOES = { DE: 1, DA: 1, DO: 1, DAS: 1, DOS: 1, E: 1 };
+
+        // tokens significativos do nome (sem acentos, sem preposições)
+        function tokensNome(nome) {
+          return normalizar(nome)
+            .split(" ")
+            .filter(function (t) {
+              return t && !PREPOSICOES[t];
+            });
+        }
+
+        // nomes casam se o conjunto de tokens de um estiver CONTIDO no outro
+        // (ignora ordem e preposições; tolera nome do meio faltando).
+        // Exige >= 2 tokens no nome menor, para não casar só pelo primeiro nome.
+        function nomesCasam(a, b) {
+          if (!a.length || !b.length) return false;
+          var menor = a.length <= b.length ? a : b;
+          var maior = a.length <= b.length ? b : a;
+          if (menor.length < 2) return menor.join(" ") === maior.join(" ");
+          var set = {};
+          maior.forEach(function (t) {
+            set[t] = 1;
+          });
+          return menor.every(function (t) {
+            return set[t];
+          });
         }
 
         // Converte serial do Excel em Date
@@ -463,18 +492,19 @@
           // só validamos por procedimento se as duas planilhas tiverem a coluna
           var validarProcedimento = !!(colServA && colServicoG);
 
-          // --- índice das guias por NOME + COMPETÊNCIA → lista de {convênio, status, guia, categoria} ---
-          // (o convênio é checado depois com tolerância, pois os sistemas usam rótulos diferentes;
-          //  o status indica ONDE a guia está; a categoria valida o procedimento)
+          // --- índice das guias por COMPETÊNCIA → lista de guias ---
+          // (o nome é comparado por tokens na busca, o convênio com tolerância,
+          //  e a categoria valida o procedimento; o status indica onde a guia está)
           var indiceGuias = {};
           guias.rows.forEach(function (g) {
-            var chave = normalizar(g[colNomeG]) + "|" + compDaGuia(g);
-            (indiceGuias[chave] = indiceGuias[chave] || []).push({
+            var comp = compDaGuia(g);
+            (indiceGuias[comp] = indiceGuias[comp] || []).push({
               conv: normalizar(g[colConvG]),
               status: colStatusG ? String(g[colStatusG]).trim() : "",
               guia: colGuiaG ? g[colGuiaG] : "",
               cat: colServicoG ? consolidar(g[colServicoG]) : "",
               criacao: colDataCriacaoG ? tempoCriacao(g[colDataCriacaoG]) : 0,
+              tokens: tokensNome(g[colNomeG]),
             });
           });
 
@@ -567,9 +597,13 @@
             var agendaCat = colServA
               ? categoriaAgenda(a[colServA], colEspA ? a[colEspA] : "")
               : "";
-            var chave =
-              normalizar(a[colNomeA]) + "|" + competencia(a[colDataA]);
-            var res = escolherGuia(convA, agendaCat, indiceGuias[chave] || []);
+            // candidatos: guias da mesma competência cujo nome casa por tokens
+            var compA = competencia(a[colDataA]);
+            var tokensA = tokensNome(a[colNomeA]);
+            var candidatos = (indiceGuias[compA] || []).filter(function (g) {
+              return nomesCasam(tokensA, g.tokens);
+            });
+            var res = escolherGuia(convA, agendaCat, candidatos);
 
             var linha = Object.assign({}, a);
             if (res) {
