@@ -208,9 +208,21 @@
           return aoa.length ? 0 : -1;
         }
 
+        // remove pontuação do convênio (hífens, barras…), deixando só letras,
+        // números e espaços. Ex.: "PRO SAUDE - TJDFT" e "PRO-SAUDE TJDFT" → iguais
+        function limparConvenio(c) {
+          return String(c)
+            .replace(/[^A-Z0-9 ]+/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+        }
+
         // convênios casam se forem iguais OU se um contiver o outro
-        // ("CBMDF ABA" ~ "CBMDF"), mas não "BRADESCO SAUDE" x "PORTO SAUDE"
+        // ("CBMDF ABA" ~ "CBMDF"), ignorando pontuação,
+        // mas não "BRADESCO SAUDE" x "PORTO SAUDE"
         function convenioCasa(a, b) {
+          a = limparConvenio(a);
+          b = limparConvenio(b);
           if (!a || !b) return false;
           if (a === b) return true;
           if (a.length >= 4 && b.indexOf(a) !== -1) return true;
