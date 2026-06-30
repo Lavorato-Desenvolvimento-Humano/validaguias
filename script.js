@@ -307,6 +307,15 @@
           });
         }
 
+        // convênios que NÃO exigem guia (pagamento particular, programa próprio):
+        // o atendimento é marcado como "Guia não necessária", não como pendente.
+        var CONVENIOS_SEM_GUIA = ["PARTICULAR", "SOCIAL LAVORATO"];
+        function isConvenioSemGuia(conv) {
+          return CONVENIOS_SEM_GUIA.some(function (c) {
+            return conv.indexOf(c) !== -1;
+          });
+        }
+
         // converte a data de criação da guia em número comparável (timestamp);
         // aceita Date nativo, "AAAA-MM-DD HH:MM:SS" e "DD/MM/AAAA"
         function tempoCriacao(v) {
@@ -634,8 +643,21 @@
           var encontradas = 0;
           var sinalizadas = 0;
           var porStatus = {};
+          var semGuia = 0;
           var saida = agenda.rows.map(function (a) {
             var convA = normalizar(a[colConvA]);
+
+            // convênios que não exigem guia (particular / programa próprio):
+            // marca como "Guia não necessária" e não entra em pendente
+            if (isConvenioSemGuia(convA)) {
+              var l = Object.assign({}, a);
+              l["Situação da Guia"] = "Guia não necessária";
+              l["guias"] = "";
+              l["Obs. Validação"] = "";
+              semGuia++;
+              return l;
+            }
+
             var agendaCat = colServA
               ? categoriaAgenda(a[colServA], colEspA ? a[colEspA] : "")
               : "";
@@ -729,7 +751,7 @@
 
           // --- resumo discreto ---
           var total = saida.length;
-          var pendentes = total - encontradas;
+          var pendentes = total - encontradas - semGuia;
           status.textContent = "Planilha gerada e baixada: guias_cruzadas.xlsx";
           // detalhamento por status (ex.: "Assinado", "Enviado a BM")
           var detalhe = Object.keys(porStatus)
@@ -748,6 +770,9 @@
               sinalizadas +
               "</b> com guia de outro procedimento (conferir)</span>"
             : "";
+          var semGuiaHtml = semGuia
+            ? "<span><b>" + semGuia + "</b> sem guia necessária</span>"
+            : "";
           resumo.innerHTML =
             "<span><b>" +
             total +
@@ -758,6 +783,7 @@
             "<span><b>" +
             pendentes +
             "</b> pendentes</span>" +
+            semGuiaHtml +
             detalhe +
             sinalizadasHtml;
           resumo.style.display = "block";
