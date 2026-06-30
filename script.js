@@ -330,6 +330,22 @@
           return 0;
         }
 
+        // converte uma data em número comparável AAAAMMDD (ignora a hora);
+        // aceita Date nativo, "DD/MM/AAAA" e "AAAA-MM-DD"
+        function diaNum(v) {
+          if (v instanceof Date && !isNaN(v))
+            return (
+              v.getFullYear() * 10000 + (v.getMonth() + 1) * 100 + v.getDate()
+            );
+          if (v == null || v === "") return 0;
+          var s = String(v).trim(), m;
+          if ((m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/)))
+            return +m[3] * 10000 + +m[2] * 100 + +m[1];
+          if ((m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/)))
+            return +m[1] * 10000 + +m[2] * 100 + +m[3];
+          return 0;
+        }
+
         // --- leitura de arquivo --------------------------------------------
 
         function lerPlanilha(file) {
@@ -481,6 +497,8 @@
             "EMISSAO",
             "DATA-CRIACAO",
           ]);
+          var colValidadeG = acharColuna(guias.headers, ["VALIDADE", "VENCIMENTO"]);
+          var colQtdG = acharColuna(guias.headers, ["QUANTIDADE", "QTD", "SESSOES"]);
           // competência pode vir como coluna única OU separada em mês + ano
           var colCompG = acharColuna(guias.headers, [
             "COMPETENCIA",
@@ -516,33 +534,38 @@
           // só validamos por procedimento se as duas planilhas tiverem a coluna
           var validarProcedimento = !!(colServA && colServicoG);
 
-          // --- índice das guias por COMPETÊNCIA → lista de guias ---
-          // (o nome é comparado por tokens na busca, o convênio com tolerância,
-          //  e a categoria valida o procedimento; o status indica onde a guia está)
-          var indiceGuias = {};
-          guias.rows.forEach(function (g) {
-            var comp = compDaGuia(g);
-            (indiceGuias[comp] = indiceGuias[comp] || []).push({
+          // --- índice das guias (lista única) ---
+          // (nome comparado por tokens; convênio com tolerância; categoria valida o
+          //  procedimento; status indica onde está; validade/quantidade definem a
+          //  cobertura — uma guia cobre até "qtd" sessões enquanto estiver válida)
+          var temValidade = !!colValidadeG;
+          var listaGuias = guias.rows.map(function (g) {
+            return {
               conv: normalizar(g[colConvG]),
               status: colStatusG ? String(g[colStatusG]).trim() : "",
               guia: colGuiaG ? g[colGuiaG] : "",
               cat: colServicoG ? consolidar(g[colServicoG]) : "",
               criacao: colDataCriacaoG ? tempoCriacao(g[colDataCriacaoG]) : 0,
+              comp: compDaGuia(g),
+              validadeDia: colValidadeG ? diaNum(g[colValidadeG]) : 0,
+              qtd: colQtdG ? parseInt(g[colQtdG], 10) || 1 : 1,
+              usados: 0,
               tokens: tokensNome(g[colNomeG]),
-            });
+            };
           });
 
-          // retorna a primeira guia ainda NÃO usada de uma lista (ou null)
+          // uma guia ainda tem cobertura se foi usada menos que a quantidade autorizada
+          function disponivel(g) {
+            return g.usados < (g.qtd || 1);
+          }
           function primeiraLivre(lista) {
             for (var i = 0; i < lista.length; i++) {
-              if (!lista[i].usada) return lista[i];
+              if (disponivel(lista[i])) return lista[i];
             }
             return null;
           }
 
-          // escolhe a guia para um agendamento, CONSUMINDO uma guia por sessão:
-          // cada guia de procedimento é atribuída no máximo a uma sessão, para que
-          // cada agendamento tenha o SEU próprio número de guia.
+          // escolhe a guia para um agendamento, consumindo 1 sessão da quantidade.
           // retorna { guia, obs } ou null (pendente). obs != "" sinaliza divergência.
           function escolherGuia(convA, agendaCat, guiasDoPaciente) {
             // só guias do mesmo convênio (com tolerância de nome)
@@ -551,11 +574,11 @@
             });
             if (!doConvenio.length) return null;
 
-            // sem validação por procedimento → consome qualquer guia livre (1 por sessão)
+            // sem validação por procedimento → consome qualquer guia com cobertura
             if (!validarProcedimento) {
               var qualquer = primeiraLivre(doConvenio);
               if (qualquer) {
-                qualquer.usada = true;
+                qualquer.usados++;
                 return { guia: qualquer, obs: "" };
               }
               return null;
@@ -567,28 +590,23 @@
                 return g.cat === agendaCat;
               });
               if (mesmaCat.length) {
-                // Bradesco (renovação semanal), exceto avaliação neuro: usa SEMPRE
-                // a guia mais recente por data — corresponde à semana do atendimento;
-                // é compartilhada entre as sessões (não consome) e ignora as antigas.
+                // Bradesco (renovação semanal), exceto avaliação neuro: prefere a
+                // guia mais recente por data (corresponde à semana do atendimento)
                 if (
                   isConvenioRenovaSemanal(convA) &&
                   agendaCat !== "AVALIACAO NEUROPSICOLOGICA"
                 ) {
-                  var recente = mesmaCat[0];
-                  for (var k = 1; k < mesmaCat.length; k++) {
-                    if (mesmaCat[k].criacao > recente.criacao)
-                      recente = mesmaCat[k];
-                  }
-                  return { guia: recente, obs: "" };
+                  mesmaCat = mesmaCat.slice().sort(function (a, b) {
+                    return b.criacao - a.criacao;
+                  });
                 }
-                // demais: distribui uma guia distinta por sessão (consome)
                 var livre = primeiraLivre(mesmaCat);
                 if (livre) {
-                  livre.usada = true;
+                  livre.usados++;
                   return { guia: livre, obs: "" };
                 }
-                // há guias dessa categoria, mas todas já foram atribuídas a outras
-                // sessões (mais sessões do que guias) → pendente
+                // há guias dessa categoria, mas a quantidade autorizada se esgotou
+                // (mais sessões do que o autorizado) → pendente
                 return null;
               }
             }
@@ -607,7 +625,7 @@
               }
             }
 
-            // 3) tem guia no convênio/mês, mas de outro procedimento → assina sinalizando
+            // 3) tem guia no convênio, mas de outro procedimento → assina sinalizando
             //    (apenas informativo; não consome a guia)
             return { guia: doConvenio[0], obs: "Guia de outro procedimento" };
           }
@@ -621,11 +639,16 @@
             var agendaCat = colServA
               ? categoriaAgenda(a[colServA], colEspA ? a[colEspA] : "")
               : "";
-            // candidatos: guias da mesma competência cujo nome casa por tokens
-            var compA = competencia(a[colDataA]);
+            // candidatos: nome casa por tokens E a guia cobre a data do atendimento.
+            // Com coluna de validade: a guia vale se a data do atendimento <= validade
+            // (resolve guia do mês anterior ainda válida). Sem validade: usa a competência.
             var tokensA = tokensNome(a[colNomeA]);
-            var candidatos = (indiceGuias[compA] || []).filter(function (g) {
-              return nomesCasam(tokensA, g.tokens);
+            var diaA = diaNum(a[colDataA]);
+            var compA = competencia(a[colDataA]);
+            var candidatos = listaGuias.filter(function (g) {
+              if (!nomesCasam(tokensA, g.tokens)) return false;
+              if (temValidade) return g.validadeDia === 0 || g.validadeDia >= diaA;
+              return g.comp === compA;
             });
             var res = escolherGuia(convA, agendaCat, candidatos);
 
